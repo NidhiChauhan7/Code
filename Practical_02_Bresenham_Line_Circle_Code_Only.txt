@@ -1,0 +1,135 @@
+// Practical 2: Bresenham's Line and Circle drawing algorithm
+// Mac compile: g++ bresenham.cpp -o bresenham -framework OpenGL -framework GLUT -Wno-deprecated
+// Windows    : g++ bresenham.cpp -o bresenham.exe -lfreeglut -lopengl32 -lglu32
+
+// Practical 2: Bresenham's Line and Circle Drawing Algorithms (OpenGL/GLUT)
+
+#include <iostream>
+#include <cstdlib>      // abs()
+#include <algorithm>    // swap()
+
+    #include <GLUT/glut.h>
+    #include <GL/glut.h>
+
+using namespace std;
+
+// Global input values
+int lineX1, lineY1, lineX2, lineY2;   // end points of line
+int centerX, centerY, radius;         // circle data
+
+// Plot one pixel (must be called between glBegin and glEnd)
+void plotPixel(int x, int y)
+{
+    glVertex2i(x, y);
+}
+
+// ---------------- Bresenham's Line Algorithm (all slopes) ----------------
+void bresenhamLine(int x1, int y1, int x2, int y2)
+{
+    int dx = abs(x2 - x1);
+    int dy = abs(y2 - y1);
+    int sx = (x2 >= x1) ? 1 : -1;      // step direction in x
+    int sy = (y2 >= y1) ? 1 : -1;      // step direction in y
+
+    bool steep = (dy > dx);            // slope > 1 ?
+    if (steep)
+        swap(dx, dy);                  // now dx = major axis length
+
+    int p = 2 * dy - dx;               // initial decision parameter
+    int x = x1, y = y1;
+
+    for (int i = 0; i <= dx; i++)      // dx+1 pixels in total
+    {
+        plotPixel(x, y);
+
+        if (p >= 0)                    // move along the minor axis too
+        {
+            if (steep) x += sx;
+            else       y += sy;
+            p -= 2 * dx;
+        }
+        // always move along the major axis
+        if (steep) y += sy;
+        else       x += sx;
+        p += 2 * dy;
+    }
+}
+
+// Plot 8 symmetric points of a circle
+void plotCirclePoints(int xc, int yc, int x, int y)
+{
+    plotPixel(xc + x, yc + y);
+    plotPixel(xc - x, yc + y);
+    plotPixel(xc + x, yc - y);
+    plotPixel(xc - x, yc - y);
+    plotPixel(xc + y, yc + x);
+    plotPixel(xc - y, yc + x);
+    plotPixel(xc + y, yc - x);
+    plotPixel(xc - y, yc - x);
+}
+
+// ---------------- Bresenham's Circle Algorithm ----------------
+void bresenhamCircle(int xc, int yc, int r)
+{
+    int x = 0, y = r;
+    int d = 3 - 2 * r;                 // initial decision parameter
+
+    while (x <= y)
+    {
+        plotCirclePoints(xc, yc, x, y);
+
+        if (d < 0)
+            d = d + 4 * x + 6;
+        else
+        {
+            d = d + 4 * (x - y) + 10;
+            y--;
+        }
+        x++;
+    }
+}
+
+// Display callback
+void display()
+{
+    glClear(GL_COLOR_BUFFER_BIT);
+    glPointSize(2.0f);
+
+    glBegin(GL_POINTS);
+        glColor3f(1.0f, 0.0f, 0.0f);                         // line  : red
+        bresenhamLine(lineX1, lineY1, lineX2, lineY2);
+
+        glColor3f(0.0f, 1.0f, 0.0f);                         // circle: green
+        bresenhamCircle(centerX, centerY, radius);
+    glEnd();
+
+    glFlush();
+}
+
+// Initialisation: 2D orthographic view of 500 x 500 pixels
+void init()
+{
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluOrtho2D(0, 500, 0, 500);
+}
+
+int main(int argc, char** argv)
+{
+    cout << "Enter line end points (x1 y1 x2 y2): ";
+    cin >> lineX1 >> lineY1 >> lineX2 >> lineY2;
+    cout << "Enter circle centre and radius (xc yc r): ";
+    cin >> centerX >> centerY >> radius;
+
+    glutInit(&argc, argv);
+    glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
+    glutInitWindowSize(500, 500);
+    glutInitWindowPosition(100, 100);
+    glutCreateWindow("Practical 2 - Bresenham Line and Circle");
+
+    init();
+    glutDisplayFunc(display);
+    glutMainLoop();
+    return 0;
+}

@@ -1,0 +1,135 @@
+// Practical 3: Fill a polygon using scan line algorithm
+// Mac compile: g++ scanfill.cpp -o scanfill -framework OpenGL -framework GLUT -Wno-deprecated
+// Windows    : g++ scanfill.cpp -o scanfill.exe -lfreeglut -lopengl32 -lglu32
+
+// Practical 3: Polygon filling using the Scan-Line Algorithm (OpenGL/GLUT)
+
+#include <iostream>
+#include <algorithm>    // swap()
+
+
+    #include <GLUT/glut.h>
+
+    #include <GL/glut.h>
+
+
+using namespace std;
+
+#define MAX_VERTICES 20
+
+int n;                              // number of vertices
+int px[MAX_VERTICES], py[MAX_VERTICES];   // polygon vertices
+
+// Scan-line fill: fills the polygon row by row
+void scanlineFill()
+{
+    // Step 1: find ymin and ymax
+    int yMin = py[0], yMax = py[0];
+    for (int i = 1; i < n; i++)
+    {
+        if (py[i] < yMin) yMin = py[i];
+        if (py[i] > yMax) yMax = py[i];
+    }
+
+    glBegin(GL_POINTS);
+    // Step 2: process every scan line
+    for (int scan = yMin; scan < yMax; scan++)
+    {
+        float xInter[MAX_VERTICES];     // intersection x-values
+        int count = 0;
+
+        // Step 3: find intersections with all edges
+        for (int i = 0; i < n; i++)
+        {
+            int j = (i + 1) % n;        // next vertex (wraps around)
+            int x1 = px[i], y1 = py[i];
+            int x2 = px[j], y2 = py[j];
+
+            if (y1 == y2) continue;     // ignore horizontal edges
+
+            if (y1 > y2)                // make sure y1 < y2
+            {
+                swap(x1, x2);
+                swap(y1, y2);
+            }
+
+            // count edge only if y1 <= scan < y2
+            if (scan >= y1 && scan < y2)
+            {
+                xInter[count] = x1 + (float)(scan - y1) * (x2 - x1) / (y2 - y1);
+                count++;
+            }
+        }
+
+        // Step 4: sort intersections (bubble sort)
+        for (int a = 0; a < count - 1; a++)
+            for (int b = 0; b < count - 1 - a; b++)
+                if (xInter[b] > xInter[b + 1])
+                    swap(xInter[b], xInter[b + 1]);
+
+        // Step 5: fill between pairs of intersections
+        for (int k = 0; k + 1 < count; k += 2)
+        {
+            int xStart = (int)(xInter[k] + 0.5f);       // round
+            int xEnd   = (int)(xInter[k + 1] + 0.5f);
+            for (int x = xStart; x <= xEnd; x++)
+                glVertex2i(x, scan);
+        }
+    }
+    glEnd();
+}
+
+// Display callback
+void display()
+{
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    // Fill the polygon (cyan)
+    glColor3f(0.0f, 1.0f, 1.0f);
+    scanlineFill();
+
+    // Draw the boundary (white)
+    glColor3f(1.0f, 1.0f, 1.0f);
+    glBegin(GL_LINE_LOOP);
+    for (int i = 0; i < n; i++)
+        glVertex2i(px[i], py[i]);
+    glEnd();
+
+    glFlush();
+}
+
+// Initialisation: 2D view of 400 x 400 pixels
+void init()
+{
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluOrtho2D(0, 400, 0, 400);
+}
+
+int main(int argc, char** argv)
+{
+    cout << "Enter number of vertices (3 to " << MAX_VERTICES << "): ";
+    cin >> n;
+    if (n < 3 || n > MAX_VERTICES)
+    {
+        cout << "Invalid number of vertices." << endl;
+        return 1;
+    }
+    for (int i = 0; i < n; i++)
+    {
+        cout << "Enter x y for vertex " << i + 1 << ": ";
+        cin >> px[i] >> py[i];
+    }
+
+    glutInit(&argc, argv);
+    glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
+    glutInitWindowSize(400, 400);
+    glutInitWindowPosition(100, 100);
+    glutCreateWindow("Practical 3 - Scan Line Polygon Fill");
+
+    init();
+    glutDisplayFunc(display);
+    glutMainLoop();
+    return 0;
+}

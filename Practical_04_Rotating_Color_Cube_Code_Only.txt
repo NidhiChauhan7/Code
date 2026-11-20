@@ -1,0 +1,120 @@
+// Practical 4: Color cube spun using OpenGL transformation matrices
+// Mac compile: g++ cube.cpp -o cube -framework OpenGL -framework GLUT -Wno-deprecated
+// Windows    : g++ cube.cpp -o cube.exe -lfreeglut -lopengl32 -lglu32
+
+// Practical 4: Draw a color cube and spin it using OpenGL transformation matrices
+
+    #include <GLUT/glut.h>
+    #include <GL/glut.h>
+
+float angleX = 0.0f;    // rotation angle about X axis
+float angleY = 0.0f;    // rotation angle about Y axis
+
+// Draw a cube of side 2 centred at the origin; each face has its own color
+void drawCube()
+{
+    glBegin(GL_QUADS);
+
+        // Front face (z = +1) - red
+        glColor3f(1.0f, 0.0f, 0.0f);
+        glVertex3f(-1.0f, -1.0f,  1.0f);
+        glVertex3f( 1.0f, -1.0f,  1.0f);
+        glVertex3f( 1.0f,  1.0f,  1.0f);
+        glVertex3f(-1.0f,  1.0f,  1.0f);
+
+        // Back face (z = -1) - green
+        glColor3f(0.0f, 1.0f, 0.0f);
+        glVertex3f(-1.0f, -1.0f, -1.0f);
+        glVertex3f(-1.0f,  1.0f, -1.0f);
+        glVertex3f( 1.0f,  1.0f, -1.0f);
+        glVertex3f( 1.0f, -1.0f, -1.0f);
+
+        // Top face (y = +1) - blue
+        glColor3f(0.0f, 0.0f, 1.0f);
+        glVertex3f(-1.0f,  1.0f, -1.0f);
+        glVertex3f(-1.0f,  1.0f,  1.0f);
+        glVertex3f( 1.0f,  1.0f,  1.0f);
+        glVertex3f( 1.0f,  1.0f, -1.0f);
+
+        // Bottom face (y = -1) - yellow
+        glColor3f(1.0f, 1.0f, 0.0f);
+        glVertex3f(-1.0f, -1.0f, -1.0f);
+        glVertex3f( 1.0f, -1.0f, -1.0f);
+        glVertex3f( 1.0f, -1.0f,  1.0f);
+        glVertex3f(-1.0f, -1.0f,  1.0f);
+
+        // Right face (x = +1) - magenta
+        glColor3f(1.0f, 0.0f, 1.0f);
+        glVertex3f( 1.0f, -1.0f, -1.0f);
+        glVertex3f( 1.0f,  1.0f, -1.0f);
+        glVertex3f( 1.0f,  1.0f,  1.0f);
+        glVertex3f( 1.0f, -1.0f,  1.0f);
+
+        // Left face (x = -1) - cyan
+        glColor3f(0.0f, 1.0f, 1.0f);
+        glVertex3f(-1.0f, -1.0f, -1.0f);
+        glVertex3f(-1.0f, -1.0f,  1.0f);
+        glVertex3f(-1.0f,  1.0f,  1.0f);
+        glVertex3f(-1.0f,  1.0f, -1.0f);
+
+    glEnd();
+}
+
+// Display callback
+void display()
+{
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glMatrixMode(GL_MODELVIEW);     // select model-view matrix
+    glLoadIdentity();               // reset to identity matrix
+
+    glRotatef(angleX, 1.0f, 0.0f, 0.0f);   // rotation matrix about X axis
+    glRotatef(angleY, 0.0f, 1.0f, 0.0f);   // rotation matrix about Y axis
+
+    drawCube();
+
+    glutSwapBuffers();              // show the finished frame
+}
+
+// Reshape callback: set viewport and projection
+void reshape(int w, int h)
+{
+    if (h == 0) h = 1;
+    glViewport(0, 0, w, h);
+
+    float aspect = (float)w / (float)h;
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(-3.0 * aspect, 3.0 * aspect, -3.0, 3.0, -10.0, 10.0);
+    glMatrixMode(GL_MODELVIEW);
+}
+
+// Timer callback: update angles about every 16 ms (~60 frames per second)
+void timer(int value)
+{
+    angleX += 1.0f;
+    angleY += 1.5f;
+    if (angleX > 360.0f) angleX -= 360.0f;
+    if (angleY > 360.0f) angleY -= 360.0f;
+
+    glutPostRedisplay();            // request redraw
+    glutTimerFunc(16, timer, 0);    // call timer again
+}
+
+int main(int argc, char** argv)
+{
+    glutInit(&argc, argv);
+    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
+    glutInitWindowSize(500, 500);
+    glutInitWindowPosition(100, 100);
+    glutCreateWindow("Practical 4 - Rotating Color Cube");
+
+    glEnable(GL_DEPTH_TEST);                // hidden surface removal
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+
+    glutDisplayFunc(display);
+    glutReshapeFunc(reshape);
+    glutTimerFunc(0, timer, 0);             // start animation
+    glutMainLoop();
+    return 0;
+}
