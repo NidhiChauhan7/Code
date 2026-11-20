@@ -1,0 +1,299 @@
+==============================================================================
+COMPUTER GRAPHICS LAB - MITAOE
+==============================================================================
+
+1. PRACTICAL NUMBER AND TITLE
+------------------------------------------------------------------------------
+Practical No. 02
+Implement Bresenham's Line and circle drawing algorithm.
+
+
+2. AIM
+------------------------------------------------------------------------------
+To draw a line and a circle on the screen using Bresenham's line algorithm and
+Bresenham's (midpoint) circle algorithm, which use only integer arithmetic.
+
+
+3. THEORY
+------------------------------------------------------------------------------
+A) BRESENHAM'S LINE ALGORITHM
+  * Pixels are discrete, so a line must be approximated by choosing the
+    pixel closest to the true line at each step.
+  * The algorithm uses only integer addition/subtraction (no floating point,
+    no rounding), so it is fast.
+  * For a line with slope 0 < m < 1 (from (x1,y1) to (x2,y2)):
+        dx = x2 - x1,   dy = y2 - y1
+        Initial decision parameter:   p0 = 2*dy - dx
+    At each step x increases by 1:
+        if p < 0 : next pixel = (x+1, y)      and  p = p + 2*dy
+        if p >= 0: next pixel = (x+1, y+1)    and  p = p + 2*dy - 2*dx
+  * The program below handles all slopes and directions by:
+        - using absolute dx, dy and step signs sx, sy
+        - swapping the roles of x and y when the line is steep (dy > dx).
+
+B) BRESENHAM'S CIRCLE ALGORITHM (Midpoint circle)
+  * Circle equation (centre at origin):  x^2 + y^2 = r^2
+  * A circle has 8-way symmetry, so only one octant (x = 0 to x = y) is
+    computed; the other 7 points are obtained by symmetry:
+        (x,y) (y,x) (-x,y) (-y,x) (x,-y) (y,-x) (-x,-y) (-y,-x)
+  * Start at (0, r).
+        Initial decision parameter:  d = 3 - 2r
+    For each step (x increases by 1):
+        if d < 0 :  d = d + 4x + 6               (y stays same)
+        else     :  d = d + 4(x - y) + 10        (y = y - 1)
+  * Repeat while x <= y. Add the centre (xc, yc) to every plotted point.
+
+
+4. ALGORITHM
+------------------------------------------------------------------------------
+BRESENHAM LINE (0 < slope < 1 version, easy to memorize)
+1. Input the end points (x1,y1) and (x2,y2).
+2. Calculate dx = x2 - x1 and dy = y2 - y1.
+3. Calculate p = 2*dy - dx. Set x = x1, y = y1. Plot (x, y).
+4. Repeat until x = x2:
+     a. x = x + 1
+     b. if p < 0:  p = p + 2*dy
+        else:      y = y + 1;  p = p + 2*dy - 2*dx
+     c. Plot (x, y).
+(General code: same idea, but with |dx|, |dy|, direction signs, and x/y
+ swapped for steep lines.)
+
+BRESENHAM CIRCLE
+1. Input the centre (xc, yc) and radius r.
+2. Set x = 0, y = r and d = 3 - 2*r.
+3. While x <= y:
+     a. Plot the 8 symmetric points around (xc, yc).
+     b. If d < 0:  d = d + 4*x + 6
+        else:      d = d + 4*(x - y) + 10;  y = y - 1
+     c. x = x + 1
+4. Stop.
+
+
+5. SOURCE CODE
+------------------------------------------------------------------------------
+----- BEGIN CODE -----
+// Practical 2: Bresenham's Line and Circle Drawing Algorithms (OpenGL/GLUT)
+
+#include <iostream>
+#include <cstdlib>      // abs()
+#include <algorithm>    // swap()
+
+#ifdef __APPLE__
+    #include <GLUT/glut.h>
+#else
+    #include <GL/glut.h>
+#endif
+
+using namespace std;
+
+// Global input values
+int lineX1, lineY1, lineX2, lineY2;   // end points of line
+int centerX, centerY, radius;         // circle data
+
+// Plot one pixel (must be called between glBegin and glEnd)
+void plotPixel(int x, int y)
+{
+    glVertex2i(x, y);
+}
+
+// ---------------- Bresenham's Line Algorithm (all slopes) ----------------
+void bresenhamLine(int x1, int y1, int x2, int y2)
+{
+    int dx = abs(x2 - x1);
+    int dy = abs(y2 - y1);
+    int sx = (x2 >= x1) ? 1 : -1;      // step direction in x
+    int sy = (y2 >= y1) ? 1 : -1;      // step direction in y
+
+    bool steep = (dy > dx);            // slope > 1 ?
+    if (steep)
+        swap(dx, dy);                  // now dx = major axis length
+
+    int p = 2 * dy - dx;               // initial decision parameter
+    int x = x1, y = y1;
+
+    for (int i = 0; i <= dx; i++)      // dx+1 pixels in total
+    {
+        plotPixel(x, y);
+
+        if (p >= 0)                    // move along the minor axis too
+        {
+            if (steep) x += sx;
+            else       y += sy;
+            p -= 2 * dx;
+        }
+        // always move along the major axis
+        if (steep) y += sy;
+        else       x += sx;
+        p += 2 * dy;
+    }
+}
+
+// Plot 8 symmetric points of a circle
+void plotCirclePoints(int xc, int yc, int x, int y)
+{
+    plotPixel(xc + x, yc + y);
+    plotPixel(xc - x, yc + y);
+    plotPixel(xc + x, yc - y);
+    plotPixel(xc - x, yc - y);
+    plotPixel(xc + y, yc + x);
+    plotPixel(xc - y, yc + x);
+    plotPixel(xc + y, yc - x);
+    plotPixel(xc - y, yc - x);
+}
+
+// ---------------- Bresenham's Circle Algorithm ----------------
+void bresenhamCircle(int xc, int yc, int r)
+{
+    int x = 0, y = r;
+    int d = 3 - 2 * r;                 // initial decision parameter
+
+    while (x <= y)
+    {
+        plotCirclePoints(xc, yc, x, y);
+
+        if (d < 0)
+            d = d + 4 * x + 6;
+        else
+        {
+            d = d + 4 * (x - y) + 10;
+            y--;
+        }
+        x++;
+    }
+}
+
+// Display callback
+void display()
+{
+    glClear(GL_COLOR_BUFFER_BIT);
+    glPointSize(2.0f);
+
+    glBegin(GL_POINTS);
+        glColor3f(1.0f, 0.0f, 0.0f);                         // line  : red
+        bresenhamLine(lineX1, lineY1, lineX2, lineY2);
+
+        glColor3f(0.0f, 1.0f, 0.0f);                         // circle: green
+        bresenhamCircle(centerX, centerY, radius);
+    glEnd();
+
+    glFlush();
+}
+
+// Initialisation: 2D orthographic view of 500 x 500 pixels
+void init()
+{
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluOrtho2D(0, 500, 0, 500);
+}
+
+int main(int argc, char** argv)
+{
+    cout << "Enter line end points (x1 y1 x2 y2): ";
+    cin >> lineX1 >> lineY1 >> lineX2 >> lineY2;
+    cout << "Enter circle centre and radius (xc yc r): ";
+    cin >> centerX >> centerY >> radius;
+
+    glutInit(&argc, argv);
+    glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
+    glutInitWindowSize(500, 500);
+    glutInitWindowPosition(100, 100);
+    glutCreateWindow("Practical 2 - Bresenham Line and Circle");
+
+    init();
+    glutDisplayFunc(display);
+    glutMainLoop();
+    return 0;
+}
+----- END CODE -----
+
+
+6. SAMPLE INPUT
+------------------------------------------------------------------------------
+Enter line end points (x1 y1 x2 y2): 100 100 400 300
+Enter circle centre and radius (xc yc r): 250 250 100
+
+(Keep all values between 0 and 500 so they fit in the window.)
+
+
+7. SAMPLE OUTPUT
+------------------------------------------------------------------------------
+Expected output (described from the algorithm; not claimed as an executed
+result):
+
+  * A 500 x 500 black window.
+  * A red line from (100,100) to (400,300).
+  * A green circle with centre (250,250) and radius 100 (it spans x and y from
+    150 to 350).
+
+Hand-calculated check - LINE from (2,2) to (10,6): dx=8, dy=4, p0 = 0
+  Pixels plotted: (2,2) (3,3) (4,3) (5,4) (6,4) (7,5) (8,5) (9,6) (10,6)
+
+Hand-calculated check - CIRCLE, centre (0,0), r = 5: d0 = 3 - 10 = -7
+  Octant points (x,y) generated: (0,5) (1,5) (2,5) (3,4)
+  [the remaining points come from the 8-way symmetry; e.g. (3,4)
+   gives (4,3), (-3,4), (-4,3), ...]
+
+
+8. HOW TO COMPILE AND RUN
+------------------------------------------------------------------------------
+Save the code as bresenham.cpp. Run it from a terminal so you can type the
+input values (the window opens after you enter them).
+
+macOS (your Mac)
+  * OpenGL and GLUT frameworks are built in (deprecated but working).
+    If no compiler: run   xcode-select --install
+  * Compile:
+        g++ bresenham.cpp -o bresenham -framework OpenGL -framework GLUT -Wno-deprecated
+  * Run:
+        ./bresenham
+
+Windows (MinGW-w64 + freeglut; must be installed separately)
+  * Compile:
+        g++ bresenham.cpp -o bresenham.exe -lfreeglut -lopengl32 -lglu32
+  * Run:   bresenham.exe
+
+Linux (for reference)
+  * sudo apt install freeglut3-dev
+  * g++ bresenham.cpp -o bresenham -lGL -lGLU -lglut
+
+
+9. IMPORTANT VIVA QUESTIONS
+------------------------------------------------------------------------------
+Q1. Why is Bresenham's algorithm better than DDA?
+A1. It uses only integer arithmetic (add/subtract) - no floating point and no
+    rounding - so it is faster and more accurate.
+
+Q2. What is the decision parameter in the line algorithm?
+A2. p = 2*dy - dx initially. If p < 0 choose (x+1,y), otherwise (x+1,y+1).
+
+Q3. What is the initial decision parameter for the circle?
+A3. d = 3 - 2r, starting at (0, r).
+
+Q4. Why do we compute only one octant of the circle?
+A4. A circle has 8-way symmetry; one computed point (x,y) gives 8 points, so
+    we compute from x = 0 to x = y and reflect.
+
+Q5. How do you handle a line with slope greater than 1?
+A5. Swap the roles of x and y: step 1 unit in y each time (major axis) and
+    decide whether to increment x.
+
+
+10. EXAM TIPS
+------------------------------------------------------------------------------
+* Common mistakes:
+    - Wrong sign in the decision parameter updates.
+    - Forgetting to add the centre (xc, yc) when plotting circle points.
+    - Not plotting all 8 symmetric points.
+    - Using float/round() - the algorithm must use integers only.
+    - Not setting gluOrtho2D, so integer pixel coordinates fall outside the
+      default -1..1 view and nothing is visible.
+* Must-remember formulas:
+      Line  : p0 = 2dy - dx ; p<0 -> p += 2dy ; p>=0 -> p += 2dy - 2dx
+      Circle: d0 = 3 - 2r   ; d<0 -> d += 4x + 6 ; d>=0 -> d += 4(x-y) + 10, y--
+* Main concept: decision parameter chooses the nearest pixel using only
+  integers.
+* Further practice (from your syllabus): implement DDA line and circle
+  algorithm / draw a moving cycle.
+==============================================================================

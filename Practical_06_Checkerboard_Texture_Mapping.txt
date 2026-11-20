@@ -1,0 +1,231 @@
+==============================================================================
+COMPUTER GRAPHICS LAB - MITAOE
+==============================================================================
+
+1. PRACTICAL NUMBER AND TITLE
+------------------------------------------------------------------------------
+Practical No. 06
+Develop a program to create texture like checkerboard using texture mapping.
+
+
+2. AIM
+------------------------------------------------------------------------------
+To generate a checkerboard pattern in memory and apply it as a texture onto a
+square (quad) using OpenGL texture mapping.
+
+
+3. THEORY
+------------------------------------------------------------------------------
+Texture mapping
+  * Texture mapping "pastes" a 2D image (texture) onto a 3D/2D surface to add
+    detail without drawing many polygons.
+  * A texture is an array of texels (texture pixels). Texture coordinates
+    (s, t), each from 0.0 to 1.0, tell which part of the image is mapped on
+    each vertex: (0,0) = one corner of the image, (1,1) = opposite corner.
+  * OpenGL interpolates the texture coordinates across the polygon.
+
+Procedural checkerboard
+  * Instead of loading an image file, the program creates the image itself.
+  * For a texel at row i and column j, with squares of 8 x 8 texels:
+        color = ( ((i & 8) == 0) XOR ((j & 8) == 0) ) ? white : black
+    (i & 8) tests the "square number" parity of the row; the XOR of row and
+    column parity gives alternate black / white squares.
+  * A 64 x 64 texture with 8-texel squares gives an 8 x 8 checkerboard.
+
+Important functions
+  glGenTextures / glBindTexture : create and select a texture object
+  glTexImage2D                  : send the image data to OpenGL
+  glTexParameteri               : set wrapping and filtering
+                                  (GL_NEAREST gives sharp square edges)
+  glTexEnvf                     : how the texture combines with color
+                                  (GL_REPLACE = use texture color only)
+  glEnable(GL_TEXTURE_2D)       : turn texturing on
+  glTexCoord2f(s,t)             : texture coordinate for the next vertex
+
+
+4. ALGORITHM
+------------------------------------------------------------------------------
+1. Declare an array image[64][64][3] (RGB texels).
+2. For every texel (i, j): compute c = ((i & 8) == 0) XOR ((j & 8) == 0);
+   if c is true set the texel to white (255,255,255) else black (0,0,0).
+3. Create a texture object: glGenTextures, glBindTexture(GL_TEXTURE_2D, id).
+4. Set texture parameters (wrap = repeat, filter = nearest) and the
+   environment mode (GL_REPLACE).
+5. Upload the image using glTexImage2D().
+6. Enable GL_TEXTURE_2D.
+7. In the display function draw a quad; before each vertex give its texture
+   coordinate with glTexCoord2f(s, t).
+8. Call glFlush() and glutMainLoop().
+
+
+5. SOURCE CODE
+------------------------------------------------------------------------------
+----- BEGIN CODE -----
+// Practical 6: Checkerboard texture using texture mapping (OpenGL/GLUT)
+
+#ifdef __APPLE__
+    #include <GLUT/glut.h>
+#else
+    #include <GL/glut.h>
+#endif
+
+#define TEX_SIZE 64                                  // texture is 64 x 64 texels
+
+GLubyte checkImage[TEX_SIZE][TEX_SIZE][3];           // RGB image data
+GLuint  textureId;                                   // texture object name
+
+// Create the checkerboard image in memory
+void makeCheckImage()
+{
+    for (int i = 0; i < TEX_SIZE; i++)
+    {
+        for (int j = 0; j < TEX_SIZE; j++)
+        {
+            // squares of 8 x 8 texels, alternate white / black
+            int c = (((i & 0x8) == 0) ^ ((j & 0x8) == 0)) * 255;
+            checkImage[i][j][0] = (GLubyte)c;        // red
+            checkImage[i][j][1] = (GLubyte)c;        // green
+            checkImage[i][j][2] = (GLubyte)c;        // blue
+        }
+    }
+}
+
+// Initialisation: build and load the texture
+void init()
+{
+    glClearColor(0.2f, 0.2f, 0.4f, 1.0f);            // dark blue background
+
+    makeCheckImage();
+
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);           // 1-byte row alignment
+    glGenTextures(1, &textureId);                    // create texture object
+    glBindTexture(GL_TEXTURE_2D, textureId);         // make it current
+
+    // wrapping and filtering
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+    // upload the image to the texture
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, TEX_SIZE, TEX_SIZE, 0,
+                 GL_RGB, GL_UNSIGNED_BYTE, checkImage);
+
+    glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+    glEnable(GL_TEXTURE_2D);                         // turn texturing on
+}
+
+// Display callback: draw a textured square
+void display()
+{
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    glBegin(GL_QUADS);
+        glTexCoord2f(0.0f, 0.0f); glVertex2f(-0.8f, -0.8f);   // bottom-left
+        glTexCoord2f(1.0f, 0.0f); glVertex2f( 0.8f, -0.8f);   // bottom-right
+        glTexCoord2f(1.0f, 1.0f); glVertex2f( 0.8f,  0.8f);   // top-right
+        glTexCoord2f(0.0f, 1.0f); glVertex2f(-0.8f,  0.8f);   // top-left
+    glEnd();
+
+    glFlush();
+}
+
+int main(int argc, char** argv)
+{
+    glutInit(&argc, argv);
+    glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
+    glutInitWindowSize(500, 500);
+    glutInitWindowPosition(100, 100);
+    glutCreateWindow("Practical 6 - Checkerboard Texture Mapping");
+
+    init();                       // texture must be created AFTER the window
+    glutDisplayFunc(display);
+    glutMainLoop();
+    return 0;
+}
+----- END CODE -----
+
+
+6. SAMPLE INPUT
+------------------------------------------------------------------------------
+No keyboard input required; the graphical output is generated by the program.
+
+
+7. SAMPLE OUTPUT
+------------------------------------------------------------------------------
+Expected output (described from the code; not claimed as an executed result):
+
+  * A 500 x 500 window with a dark blue background.
+  * A large square in the centre (from -0.8 to +0.8 in x and y) covered with
+    an 8 x 8 black-and-white checkerboard pattern with sharp square edges.
+
+  Texel colors for the first rows/columns (8-texel squares):
+      i = 0..7 , j = 0..7   -> (0==0)^(0==0) = 0 -> black
+      i = 0..7 , j = 8..15  -> (1)^(0)         = 1 -> white
+      i = 8..15, j = 0..7   -> (0)^(1)         = 1 -> white
+      i = 8..15, j = 8..15  -> (0)^(0)         = 0 -> black
+
+  To see the pattern repeat, change the texture coordinates to 0.0 - 2.0
+  (e.g., glTexCoord2f(2.0f, 2.0f)); with GL_REPEAT you get a 16 x 16 board.
+
+
+8. HOW TO COMPILE AND RUN
+------------------------------------------------------------------------------
+Save the code as checker.cpp.
+
+macOS (your Mac)
+  * Built-in OpenGL/GLUT frameworks. If no compiler: xcode-select --install
+  * Compile:
+        g++ checker.cpp -o checker -framework OpenGL -framework GLUT -Wno-deprecated
+  * Run:
+        ./checker
+
+Windows (MinGW-w64 + freeglut; must be installed separately)
+  * Compile:
+        g++ checker.cpp -o checker.exe -lfreeglut -lopengl32 -lglu32
+  * Run:   checker.exe
+
+Linux (for reference)
+  * sudo apt install freeglut3-dev
+  * g++ checker.cpp -o checker -lGL -lGLU -lglut
+
+
+9. IMPORTANT VIVA QUESTIONS
+------------------------------------------------------------------------------
+Q1. What is texture mapping?
+A1. Applying a 2D image (texture) onto a surface using texture coordinates,
+    to add detail without extra geometry.
+
+Q2. What are texture coordinates?
+A2. (s,t) values from 0 to 1 that define which point of the texture image is
+    attached to each vertex.
+
+Q3. What does glTexImage2D() do?
+A3. It sends the 2D image array (size, format, data) to OpenGL as the current
+    texture.
+
+Q4. What are GL_NEAREST and GL_LINEAR?
+A4. Texture filtering modes. GL_NEAREST picks the closest texel (sharp
+    squares); GL_LINEAR averages neighbouring texels (smooth/blurred).
+
+Q5. How is the checkerboard generated?
+A5. By XOR-ing the parity of the row-square and column-square numbers:
+    ((i & 8) == 0) ^ ((j & 8) == 0) -> white or black.
+
+
+10. EXAM TIPS
+------------------------------------------------------------------------------
+* Common mistakes:
+    - Forgetting glEnable(GL_TEXTURE_2D) -> plain white square appears.
+    - Calling init() (texture creation) before glutCreateWindow() -> there is
+      no OpenGL context, so the texture fails.
+    - Giving glTexCoord2f AFTER glVertex2f (it must come BEFORE the vertex).
+    - Not setting texture filter parameters.
+    - Wrong format/size in glTexImage2D (must match the array).
+* Must-remember functions: glGenTextures, glBindTexture, glTexParameteri,
+  glTexImage2D, glEnable(GL_TEXTURE_2D), glTexCoord2f.
+* Main concept: generate image array -> load as texture -> map using texture
+  coordinates on vertices.
+* Further practice (from your syllabus): create a texture-mapped cube
+  (use the texture on all 6 faces of the cube from Practical 4).
+==============================================================================

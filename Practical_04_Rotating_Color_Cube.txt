@@ -1,0 +1,271 @@
+==============================================================================
+COMPUTER GRAPHICS LAB - MITAOE
+==============================================================================
+
+1. PRACTICAL NUMBER AND TITLE
+------------------------------------------------------------------------------
+Practical No. 04
+Draw a color cube and spin it using OpenGL transformation matrices.
+
+
+2. AIM
+------------------------------------------------------------------------------
+To draw a 3D cube with a different color on each face and continuously rotate
+(spin) it using OpenGL transformation (model-view) matrices.
+
+
+3. THEORY
+------------------------------------------------------------------------------
+3D cube
+  * A cube has 8 vertices and 6 square faces. Here the cube is centred at the
+    origin with side 2: vertices have coordinates (+-1, +-1, +-1).
+  * Each face is drawn as a GL_QUADS quadrilateral with its own color.
+
+Transformation matrices in OpenGL
+  * OpenGL keeps matrices: the MODELVIEW matrix (moves/rotates objects) and
+    the PROJECTION matrix (how 3D is projected on the 2D screen).
+  * glMatrixMode(GL_MODELVIEW) selects the model-view matrix.
+  * glLoadIdentity() resets it to the identity matrix.
+  * glRotatef(angle, x, y, z) builds a rotation matrix about the axis (x,y,z)
+    and multiplies it with the current matrix.
+    Rotation about the Z axis by angle t (as a 4x4 matrix):
+
+        | cos t  -sin t   0   0 |
+        | sin t   cos t   0   0 |
+        |   0       0     1   0 |
+        |   0       0     0   1 |
+
+    Rotation about X and Y axes are similar (the rotated axis row/column
+    is the identity part).
+  * Every vertex is multiplied by this matrix: v' = M * v.
+
+Animation
+  * The rotation angle is increased a little every frame (using a timer),
+    and the screen is redrawn, so the cube appears to spin.
+  * Double buffering (GLUT_DOUBLE + glutSwapBuffers) avoids flicker.
+  * Depth test (GL_DEPTH_TEST) makes the nearer faces hide farther faces.
+
+
+4. ALGORITHM
+------------------------------------------------------------------------------
+1. Initialise GLUT with RGB + DOUBLE buffer + DEPTH buffer; create window.
+2. Enable the depth test (glEnable(GL_DEPTH_TEST)).
+3. In the reshape function, set the viewport and an orthographic projection.
+4. In the display function:
+     a. Clear color and depth buffers.
+     b. Select GL_MODELVIEW and load the identity matrix.
+     c. Apply rotation: glRotatef(angleX,1,0,0); glRotatef(angleY,0,1,0).
+     d. Draw the 6 faces with GL_QUADS, giving each face a color.
+     e. Swap the buffers.
+5. In the timer function: increase the angles (keep them below 360), call
+   glutPostRedisplay(), and register the timer again.
+6. Call glutMainLoop().
+
+
+5. SOURCE CODE
+------------------------------------------------------------------------------
+----- BEGIN CODE -----
+// Practical 4: Draw a color cube and spin it using OpenGL transformation matrices
+
+#ifdef __APPLE__
+    #include <GLUT/glut.h>
+#else
+    #include <GL/glut.h>
+#endif
+
+float angleX = 0.0f;    // rotation angle about X axis
+float angleY = 0.0f;    // rotation angle about Y axis
+
+// Draw a cube of side 2 centred at the origin; each face has its own color
+void drawCube()
+{
+    glBegin(GL_QUADS);
+
+        // Front face (z = +1) - red
+        glColor3f(1.0f, 0.0f, 0.0f);
+        glVertex3f(-1.0f, -1.0f,  1.0f);
+        glVertex3f( 1.0f, -1.0f,  1.0f);
+        glVertex3f( 1.0f,  1.0f,  1.0f);
+        glVertex3f(-1.0f,  1.0f,  1.0f);
+
+        // Back face (z = -1) - green
+        glColor3f(0.0f, 1.0f, 0.0f);
+        glVertex3f(-1.0f, -1.0f, -1.0f);
+        glVertex3f(-1.0f,  1.0f, -1.0f);
+        glVertex3f( 1.0f,  1.0f, -1.0f);
+        glVertex3f( 1.0f, -1.0f, -1.0f);
+
+        // Top face (y = +1) - blue
+        glColor3f(0.0f, 0.0f, 1.0f);
+        glVertex3f(-1.0f,  1.0f, -1.0f);
+        glVertex3f(-1.0f,  1.0f,  1.0f);
+        glVertex3f( 1.0f,  1.0f,  1.0f);
+        glVertex3f( 1.0f,  1.0f, -1.0f);
+
+        // Bottom face (y = -1) - yellow
+        glColor3f(1.0f, 1.0f, 0.0f);
+        glVertex3f(-1.0f, -1.0f, -1.0f);
+        glVertex3f( 1.0f, -1.0f, -1.0f);
+        glVertex3f( 1.0f, -1.0f,  1.0f);
+        glVertex3f(-1.0f, -1.0f,  1.0f);
+
+        // Right face (x = +1) - magenta
+        glColor3f(1.0f, 0.0f, 1.0f);
+        glVertex3f( 1.0f, -1.0f, -1.0f);
+        glVertex3f( 1.0f,  1.0f, -1.0f);
+        glVertex3f( 1.0f,  1.0f,  1.0f);
+        glVertex3f( 1.0f, -1.0f,  1.0f);
+
+        // Left face (x = -1) - cyan
+        glColor3f(0.0f, 1.0f, 1.0f);
+        glVertex3f(-1.0f, -1.0f, -1.0f);
+        glVertex3f(-1.0f, -1.0f,  1.0f);
+        glVertex3f(-1.0f,  1.0f,  1.0f);
+        glVertex3f(-1.0f,  1.0f, -1.0f);
+
+    glEnd();
+}
+
+// Display callback
+void display()
+{
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glMatrixMode(GL_MODELVIEW);     // select model-view matrix
+    glLoadIdentity();               // reset to identity matrix
+
+    glRotatef(angleX, 1.0f, 0.0f, 0.0f);   // rotation matrix about X axis
+    glRotatef(angleY, 0.0f, 1.0f, 0.0f);   // rotation matrix about Y axis
+
+    drawCube();
+
+    glutSwapBuffers();              // show the finished frame
+}
+
+// Reshape callback: set viewport and projection
+void reshape(int w, int h)
+{
+    if (h == 0) h = 1;
+    glViewport(0, 0, w, h);
+
+    float aspect = (float)w / (float)h;
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(-3.0 * aspect, 3.0 * aspect, -3.0, 3.0, -10.0, 10.0);
+    glMatrixMode(GL_MODELVIEW);
+}
+
+// Timer callback: update angles about every 16 ms (~60 frames per second)
+void timer(int value)
+{
+    angleX += 1.0f;
+    angleY += 1.5f;
+    if (angleX > 360.0f) angleX -= 360.0f;
+    if (angleY > 360.0f) angleY -= 360.0f;
+
+    glutPostRedisplay();            // request redraw
+    glutTimerFunc(16, timer, 0);    // call timer again
+}
+
+int main(int argc, char** argv)
+{
+    glutInit(&argc, argv);
+    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
+    glutInitWindowSize(500, 500);
+    glutInitWindowPosition(100, 100);
+    glutCreateWindow("Practical 4 - Rotating Color Cube");
+
+    glEnable(GL_DEPTH_TEST);                // hidden surface removal
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+
+    glutDisplayFunc(display);
+    glutReshapeFunc(reshape);
+    glutTimerFunc(0, timer, 0);             // start animation
+    glutMainLoop();
+    return 0;
+}
+----- END CODE -----
+
+
+6. SAMPLE INPUT
+------------------------------------------------------------------------------
+No keyboard input required; the graphical output is generated by the program.
+
+
+7. SAMPLE OUTPUT
+------------------------------------------------------------------------------
+Expected output (described from the code; not claimed as an executed result):
+
+  * A 500 x 500 window with a black background.
+  * A cube in the centre whose six faces are red, green, blue, yellow,
+    magenta and cyan.
+  * The cube spins continuously about the X and Y axes (about 1 degree per
+    frame about X and 1.5 degrees per frame about Y); faces nearer to the
+    viewer hide the faces behind them.
+
+Example of the rotation matrix used (rotation about Z by 90 degrees):
+  point (1, 0, 0)  ->  (0, 1, 0)
+
+
+8. HOW TO COMPILE AND RUN
+------------------------------------------------------------------------------
+Save the code as cube.cpp.
+
+macOS (your Mac)
+  * Built-in OpenGL/GLUT frameworks. If no compiler: xcode-select --install
+  * Compile:
+        g++ cube.cpp -o cube -framework OpenGL -framework GLUT -Wno-deprecated
+  * Run:
+        ./cube
+
+Windows (MinGW-w64 + freeglut; must be installed separately)
+  * Compile:
+        g++ cube.cpp -o cube.exe -lfreeglut -lopengl32 -lglu32
+  * Run:   cube.exe
+
+Linux (for reference)
+  * sudo apt install freeglut3-dev
+  * g++ cube.cpp -o cube -lGL -lGLU -lglut
+
+
+9. IMPORTANT VIVA QUESTIONS
+------------------------------------------------------------------------------
+Q1. What does glRotatef(angle, x, y, z) do?
+A1. It creates a rotation matrix of the given angle (in degrees) about the
+    axis (x,y,z) and multiplies it with the current matrix.
+
+Q2. Why is glLoadIdentity() used in display()?
+A2. To reset the model-view matrix every frame; otherwise rotations would
+    keep accumulating on top of the previous frame's matrix.
+
+Q3. Why do we need GL_DEPTH_TEST?
+A3. To perform hidden surface removal - nearer faces hide the faces behind
+    them; otherwise faces are drawn in code order.
+
+Q4. What is double buffering and why is it used?
+A4. Drawing happens in a back buffer and glutSwapBuffers() shows it at once,
+    so the animation does not flicker.
+
+Q5. Difference between GL_PROJECTION and GL_MODELVIEW?
+A5. GL_PROJECTION defines how the 3D scene is projected onto the screen
+    (orthographic/perspective); GL_MODELVIEW holds object transformations
+    (rotate, translate, scale) and the camera.
+
+
+10. EXAM TIPS
+------------------------------------------------------------------------------
+* Common mistakes:
+    - Forgetting GLUT_DEPTH in glutInitDisplayMode and glEnable(GL_DEPTH_TEST)
+      -> faces look wrong/overlapped.
+    - Forgetting GL_DEPTH_BUFFER_BIT in glClear().
+    - Using GLUT_SINGLE with glutSwapBuffers() -> flicker/no display.
+    - Not calling glLoadIdentity() -> cube spins out of control.
+    - Angles are in degrees (not radians) in glRotatef.
+    - Vertices of a face given in a zig-zag order -> twisted face.
+* Must-remember functions: glMatrixMode, glLoadIdentity, glRotatef,
+  glEnable(GL_DEPTH_TEST), glutSwapBuffers, glutTimerFunc, glutPostRedisplay.
+* Main concept: transformation = matrix multiplication of each vertex by the
+  model-view matrix; animation = change the angle and redraw repeatedly.
+* Further practice (from your syllabus): create and rotate a triangle about
+  the origin and about a fixed point (translate -> rotate -> translate back).
+==============================================================================

@@ -1,0 +1,286 @@
+==============================================================================
+COMPUTER GRAPHICS LAB - MITAOE
+==============================================================================
+
+1. PRACTICAL NUMBER AND TITLE
+------------------------------------------------------------------------------
+Practical No. 03
+Develop a program to fill the polygon using scan line algorithm.
+
+
+2. AIM
+------------------------------------------------------------------------------
+To fill the interior of a polygon with a color using the scan-line polygon
+filling algorithm.
+
+
+3. THEORY
+------------------------------------------------------------------------------
+Scan-line filling
+  * The screen is processed one horizontal line (scan line) at a time, from
+    the lowest y (ymin) of the polygon to the highest y (ymax).
+  * For every scan line:
+      1. Find the points where the scan line intersects the polygon edges.
+      2. Sort these intersection x-values from left to right.
+      3. Fill pixels between pairs of intersections:
+           (1st,2nd), (3rd,4th), ...  (odd-even / parity rule).
+         Inside the polygon the "inside/outside" status toggles at each
+         intersection.
+
+Intersection of an edge (x1,y1)-(x2,y2) with scan line y:
+        x = x1 + (y - y1) * (x2 - x1) / (y2 - y1)
+  (equivalently x increases by 1/slope for every step up in y).
+
+Special cases handled
+  * Horizontal edges (y1 = y2): ignored (no single intersection).
+  * Vertices shared by two edges: an edge is counted only if
+        ymin_of_edge <= y < ymax_of_edge
+    (lower end included, upper end excluded). This avoids counting a vertex
+    twice and keeps the number of intersections even.
+
+Works for convex and concave polygons.
+
+
+4. ALGORITHM
+------------------------------------------------------------------------------
+1. Input the number of vertices n and the vertex coordinates.
+2. Find ymin and ymax of the polygon.
+3. For each scan line y from ymin to ymax - 1:
+     a. Set count = 0.
+     b. For every edge (xi,yi)-(xj,yj) that is not horizontal:
+          - arrange so that y1 < y2
+          - if y >= y1 and y < y2: compute
+                x = x1 + (y - y1)*(x2 - x1)/(y2 - y1)
+            and store it in the intersection list; count = count + 1.
+     c. Sort the intersection list in increasing order of x.
+     d. Take the x values in pairs (x[0],x[1]), (x[2],x[3]), ...
+        and plot all pixels from the first x to the second x on line y.
+4. Draw the polygon boundary (optional) and stop.
+
+
+5. SOURCE CODE
+------------------------------------------------------------------------------
+----- BEGIN CODE -----
+// Practical 3: Polygon filling using the Scan-Line Algorithm (OpenGL/GLUT)
+
+#include <iostream>
+#include <algorithm>    // swap()
+
+#ifdef __APPLE__
+    #include <GLUT/glut.h>
+#else
+    #include <GL/glut.h>
+#endif
+
+using namespace std;
+
+#define MAX_VERTICES 20
+
+int n;                              // number of vertices
+int px[MAX_VERTICES], py[MAX_VERTICES];   // polygon vertices
+
+// Scan-line fill: fills the polygon row by row
+void scanlineFill()
+{
+    // Step 1: find ymin and ymax
+    int yMin = py[0], yMax = py[0];
+    for (int i = 1; i < n; i++)
+    {
+        if (py[i] < yMin) yMin = py[i];
+        if (py[i] > yMax) yMax = py[i];
+    }
+
+    glBegin(GL_POINTS);
+    // Step 2: process every scan line
+    for (int scan = yMin; scan < yMax; scan++)
+    {
+        float xInter[MAX_VERTICES];     // intersection x-values
+        int count = 0;
+
+        // Step 3: find intersections with all edges
+        for (int i = 0; i < n; i++)
+        {
+            int j = (i + 1) % n;        // next vertex (wraps around)
+            int x1 = px[i], y1 = py[i];
+            int x2 = px[j], y2 = py[j];
+
+            if (y1 == y2) continue;     // ignore horizontal edges
+
+            if (y1 > y2)                // make sure y1 < y2
+            {
+                swap(x1, x2);
+                swap(y1, y2);
+            }
+
+            // count edge only if y1 <= scan < y2
+            if (scan >= y1 && scan < y2)
+            {
+                xInter[count] = x1 + (float)(scan - y1) * (x2 - x1) / (y2 - y1);
+                count++;
+            }
+        }
+
+        // Step 4: sort intersections (bubble sort)
+        for (int a = 0; a < count - 1; a++)
+            for (int b = 0; b < count - 1 - a; b++)
+                if (xInter[b] > xInter[b + 1])
+                    swap(xInter[b], xInter[b + 1]);
+
+        // Step 5: fill between pairs of intersections
+        for (int k = 0; k + 1 < count; k += 2)
+        {
+            int xStart = (int)(xInter[k] + 0.5f);       // round
+            int xEnd   = (int)(xInter[k + 1] + 0.5f);
+            for (int x = xStart; x <= xEnd; x++)
+                glVertex2i(x, scan);
+        }
+    }
+    glEnd();
+}
+
+// Display callback
+void display()
+{
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    // Fill the polygon (cyan)
+    glColor3f(0.0f, 1.0f, 1.0f);
+    scanlineFill();
+
+    // Draw the boundary (white)
+    glColor3f(1.0f, 1.0f, 1.0f);
+    glBegin(GL_LINE_LOOP);
+    for (int i = 0; i < n; i++)
+        glVertex2i(px[i], py[i]);
+    glEnd();
+
+    glFlush();
+}
+
+// Initialisation: 2D view of 400 x 400 pixels
+void init()
+{
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluOrtho2D(0, 400, 0, 400);
+}
+
+int main(int argc, char** argv)
+{
+    cout << "Enter number of vertices (3 to " << MAX_VERTICES << "): ";
+    cin >> n;
+    if (n < 3 || n > MAX_VERTICES)
+    {
+        cout << "Invalid number of vertices." << endl;
+        return 1;
+    }
+    for (int i = 0; i < n; i++)
+    {
+        cout << "Enter x y for vertex " << i + 1 << ": ";
+        cin >> px[i] >> py[i];
+    }
+
+    glutInit(&argc, argv);
+    glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
+    glutInitWindowSize(400, 400);
+    glutInitWindowPosition(100, 100);
+    glutCreateWindow("Practical 3 - Scan Line Polygon Fill");
+
+    init();
+    glutDisplayFunc(display);
+    glutMainLoop();
+    return 0;
+}
+----- END CODE -----
+
+
+6. SAMPLE INPUT
+------------------------------------------------------------------------------
+Enter number of vertices (3 to 20): 5
+Enter x y for vertex 1: 100 100
+Enter x y for vertex 2: 300 100
+Enter x y for vertex 3: 350 250
+Enter x y for vertex 4: 200 350
+Enter x y for vertex 5: 50 250
+
+(Enter the vertices in order, clockwise or anticlockwise, with values from
+0 to 400.)
+
+
+7. SAMPLE OUTPUT
+------------------------------------------------------------------------------
+Expected output (described from the algorithm; not claimed as an executed
+result):
+
+  * A 400 x 400 black window.
+  * A pentagon with a white outline, completely filled with cyan.
+
+Hand-calculated check for scan line y = 200:
+  Edge (300,100)-(350,250): x = 300 + (200-100)*(350-300)/(250-100) = 333.33
+  Edge (100,100)-(50,250) : x = 100 + (200-100)*(50-100)/(250-100)  =  66.67
+  No other edge covers y = 200 (the others are horizontal or lie above
+  y = 250).
+  Sorted intersections: 66.67, 333.33
+  Pixels filled on y = 200: from x = 67 to x = 333.
+
+
+8. HOW TO COMPILE AND RUN
+------------------------------------------------------------------------------
+Save the code as scanfill.cpp. Run from a terminal (input is typed in the
+terminal before the window opens).
+
+macOS (your Mac)
+  * Built-in OpenGL/GLUT frameworks. If no compiler: xcode-select --install
+  * Compile:
+        g++ scanfill.cpp -o scanfill -framework OpenGL -framework GLUT -Wno-deprecated
+  * Run:
+        ./scanfill
+
+Windows (MinGW-w64 + freeglut; must be installed separately)
+  * Compile:
+        g++ scanfill.cpp -o scanfill.exe -lfreeglut -lopengl32 -lglu32
+  * Run:   scanfill.exe
+
+Linux (for reference)
+  * sudo apt install freeglut3-dev
+  * g++ scanfill.cpp -o scanfill -lGL -lGLU -lglut
+
+
+9. IMPORTANT VIVA QUESTIONS
+------------------------------------------------------------------------------
+Q1. What is the scan-line algorithm?
+A1. It fills a polygon by processing each horizontal scan line, finding edge
+    intersections, sorting them, and filling between pairs of intersections.
+
+Q2. Why do we sort the intersection points?
+A2. So that consecutive pairs (1st-2nd, 3rd-4th...) represent the inside
+    spans of the polygon.
+
+Q3. How are horizontal edges handled?
+A3. They are ignored, because they do not produce a single intersection with
+    a scan line.
+
+Q4. Why is the upper end of an edge excluded (y < y2)?
+A4. To avoid counting a shared vertex twice, which would make the number of
+    intersections odd and break the pairing.
+
+Q5. What is the formula for the intersection x?
+A5. x = x1 + (y - y1)*(x2 - x1)/(y2 - y1), i.e., x changes by 1/m per scan
+    line, where m is the slope.
+
+
+10. EXAM TIPS
+------------------------------------------------------------------------------
+* Common mistakes:
+    - Not skipping horizontal edges -> division by zero.
+    - Counting vertices twice (missing the y1 <= y < y2 rule).
+    - Forgetting to sort the intersection x-values.
+    - Filling between all intersections instead of in pairs.
+    - Not setting gluOrtho2D for pixel coordinates.
+* Must-remember: edge-table logic - find ymin/ymax -> for each y: intersect,
+  sort, fill pairs.
+* Main concept: odd-even (parity) rule with sorted intersections per scan line.
+* Further practice (from your syllabus): seed fill, flood fill and boundary
+  fill algorithms.
+==============================================================================
